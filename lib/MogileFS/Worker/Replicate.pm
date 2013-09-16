@@ -510,6 +510,10 @@ sub replicate {
         push @on_up_devid, $ddevid;
     }
 
+    if ($got_copy_request) {
+        MogileFS::run_global_hook('replicate_got_copy_request', $fid, \@on_devs);
+    }
+
     # We are over replicated. Let caller decide if it should rebalance.
     if ($rr->too_happy) {
         return $retunlock->(0, "too_happy", "fid $fidid is on too many devices");
