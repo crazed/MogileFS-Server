@@ -101,9 +101,11 @@ sub reap_dev {
             @fids = $dev->fid_list(limit => $limit);
             if (@fids) {
                 $self->still_alive;
+                $sto->dbh->begin_work;
                 foreach my $fid (@fids) {
                     $self->reap_fid($fid, $dev);
                 }
+                $sto->dbh->commit;
             }
             $sto->release_lock($lock);
 
