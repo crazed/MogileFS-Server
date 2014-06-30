@@ -42,6 +42,36 @@ sub reap_fid {
     $dev->forget_about($fid);
 }
 
+# we're keeping the same spirit of the order of importance
+#
+# Yet we're doing this as two atomic queries.
+#
+# In large deployments, with large drive footprints (3TB+), it's
+# increasingly important that we keep the number of insert/update/delete
+# statements as batched as possible.  This batched-reaping helps
+# to ensure the replication lag fallout from 'queue_rate_for_reaper' * 2
+# queries is minimal, as now it is only 2.  Even if you're not using
+# slaves, this is a much more performant way of doing things at the
+# database level.
+#
+# To turn this off,
+#   mogadm settings add reaper_batching_enabled "false"
+#
+sub reap_fid_batch {
+    my ($self, $devid, @fids) = @_;
+    my $sto = Mgd::get_store();
+    my $timestamp = $sto->unix_timestamp();
+    my @replicate = map { "(".$_->id.",($timestamp + 1))" } @fids;
+    my @fids_to_delete = map { $_->id } @fids;
+    my $count = 0;
+    debug("begin batch reap") if $Mgd::DEBUG >= 2;
+    my $rv1 = eval { $sto->dbh->do("INSERT IGNORE INTO file_to_replicate (fid,nexttry) VALUES ".join(",", @replicate)); };
+    debug("batch file_to_replicate query: INSERT IGNORE INTO file_to_replicate (fid,devid) VALUES ".join(",", @replicate)) if
+    my $rv2 = eval { $sto->dbh->do("DELETE FROM file_on WHERE fid in (".join(',',@fids_to_delete).") AND devid=$devid"); };
+    debug("batch delete query: DELETE FROM file_on WHERE fid in (".join(',',@fids_to_delete).") AND devid=$devid") if $Mgd::D
+    debug("end batch reap") if $Mgd::DEBUG >= 2;
+}
+
 # this returns 1000 by default
 sub reaper_inject_limit {
     my ($self) = @_;
@@ -82,6 +112,7 @@ sub reap_dev {
     }
 
     my $limit = $self->reaper_inject_limit;
+    my $batching_enabled = MogileFS::Config->server_setting_cached('reaper_batching_enabled') || 'true';
 
     # just in case a user mistakenly nuked a devid from the device table:
     my $dev = Mgd::device_factory()->get_by_id($devid);
@@ -101,8 +132,12 @@ sub reap_dev {
             @fids = $dev->fid_list(limit => $limit);
             if (@fids) {
                 $self->still_alive;
-                foreach my $fid (@fids) {
-                    $self->reap_fid($fid, $dev);
+                if ($batching_enabled eq 'true') {
+                    $self->reap_fid_batch($devid, @fids);
+                } else {
+                    foreach my $fid (@fids) {
+                        $self->reap_fid($fid, $dev);
+                    }
                 }
             }
             $sto->release_lock($lock);
