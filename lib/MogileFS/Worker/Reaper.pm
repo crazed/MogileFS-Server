@@ -63,7 +63,6 @@ sub reap_fid_batch {
     my $timestamp = $sto->unix_timestamp();
     my @replicate = map { "(".$_->id.",($timestamp + 1))" } @fids;
     my @fids_to_delete = map { $_->id } @fids;
-    my $count = 0;
     debug("begin batch reap") if $Mgd::DEBUG >= 2;
     my $rv1 = eval { $sto->dbh->do("INSERT IGNORE INTO file_to_replicate (fid,nexttry) VALUES ".join(",", @replicate)); };
     debug("batch file_to_replicate query: INSERT IGNORE INTO file_to_replicate (fid,devid) VALUES ".join(",", @replicate)) if
