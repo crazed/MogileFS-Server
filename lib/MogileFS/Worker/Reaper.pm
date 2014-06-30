@@ -65,9 +65,9 @@ sub reap_fid_batch {
     my @fids_to_delete = map { $_->id } @fids;
     debug("begin batch reap") if $Mgd::DEBUG >= 2;
     my $rv1 = eval { $sto->dbh->do("INSERT IGNORE INTO file_to_replicate (fid,nexttry) VALUES ".join(",", @replicate)); };
-    debug("batch file_to_replicate query: INSERT IGNORE INTO file_to_replicate (fid,devid) VALUES ".join(",", @replicate)) if
+    debug("batch file_to_replicate query: INSERT IGNORE INTO file_to_replicate (fid,devid) VALUES ".join(",", @replicate)) if $Mgd::DEBUG >= 2;
     my $rv2 = eval { $sto->dbh->do("DELETE FROM file_on WHERE fid in (".join(',',@fids_to_delete).") AND devid=$devid"); };
-    debug("batch delete query: DELETE FROM file_on WHERE fid in (".join(',',@fids_to_delete).") AND devid=$devid") if $Mgd::D
+    debug("batch delete query: DELETE FROM file_on WHERE fid in (".join(',',@fids_to_delete).") AND devid=$devid") if $Mgd::DEBUG >= 2;
     debug("end batch reap") if $Mgd::DEBUG >= 2;
 }
 
