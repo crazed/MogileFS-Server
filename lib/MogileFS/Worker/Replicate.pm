@@ -517,11 +517,12 @@ sub replicate {
 
     if ($rr->is_happy) {
         if ($got_copy_request) {
+            my @cache_devices = @on_up_devid;
             my %args = (
                     dmid => $fid->dmid,
                     key => $fid->{dkey},
                     fid => $fidid,
-                    devid => $fid->devids,
+                    devid => \@cache_devices,
                     path => "",
                     checksum => "",
                 );
