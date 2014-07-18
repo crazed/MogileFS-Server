@@ -522,12 +522,11 @@ sub replicate {
                     dmid => $fid->dmid,
                     key => $fid->{dkey},
                     fid => $fidid,
-                    devid => \@cache_devices,
-                    path => "",
-                    checksum => "",
+                    devids => \@cache_devices,
                 );
             debug("re-cache $fidid called, args=".join(',',keys(%args)));
-            my $rv = MogileFS::run_global_hook('file_stored', \%args);
+            debug("re-cache $fidid called, args=".join(',',(@cache_devices));
+            my $rv = MogileFS::run_global_hook('file_replicated', \%args);
             # if (defined $rv && ! $rv) { # undef = no hooks, 1 = success, 0 = failure }
             return $retunlock->(1);
         } else {
