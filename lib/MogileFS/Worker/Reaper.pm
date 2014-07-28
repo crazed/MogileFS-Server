@@ -112,7 +112,7 @@ sub reap_dev {
     # ensure the master DB is up, retry in REAP_INTERVAL if down
     unless ($self->validate_dbh) {
         $delay = REAP_INTERVAL;
-        Danga::Socket->AddTimer($delay, sub { $self->reap_dev($devid, $delay) });
+        Danga::Socket->AddTimer($delay, sub { $self->parent_ping; $self->reap_dev($devid, $delay); });
         return;
     }
 
@@ -165,7 +165,7 @@ sub reap_dev {
     return unless defined $delay;
 
     # schedule another update, delay could be REAP_BACKOFF_MAX
-    Danga::Socket->AddTimer($delay, sub { $self->reap_dev($devid, $delay) });
+    Danga::Socket->AddTimer($delay, sub { $self->parent_ping; $self->reap_dev($devid, $delay); });
 }
 
 # called when we're hopefully all done with a device, but reschedule
@@ -202,6 +202,12 @@ sub work {
             # delay the initial device reap in case any replicator cache
             # thinks the device is still alive
             Danga::Socket->AddTimer(DEVICE_SUMMARY_CACHE_TIMEOUT + 1, sub {
+                # on a large-scale system, it's possible to have 800+ dead devices
+                # with a 1TB large DB.  If you don't ping the parent here, eventually
+                # you will overrun the watchdog_timeout and the process will get
+                # killed unneccesarily due to the time it takes to query the db.  
+                # Increasing watchdog_timeout value isnt viable.
+                $self->parent_ping;
                 $self->reap_dev($dev->id, REAP_INTERVAL);
             });
 
