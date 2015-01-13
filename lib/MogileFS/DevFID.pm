@@ -181,7 +181,19 @@ sub destroy {
 
     my $sto = Mgd::get_store();
     $sto->remove_fidid_from_devid($self->fidid, $self->devid);
-    # TODO(afeid): update our cache to remove this devid from the fid!
+    if (my $memc = MogileFS::Config->memcache_client) {
+        my $memcache_ttl  = MogileFS::Config->server_setting_cached("memcache_ttl") || 3600;
+        my $memkey = "mogdevids:$self->fidid";
+        if (my $list = $memc->get($memkey)) {
+            my @devids;
+            for my $devid (@$list) {
+                if ($self->devid != $devid) {
+                    push(@devids, $devid); 
+                }
+            }
+            $memc->set($memkey, \@devids, $memcache_ttl);
+        }
+    }
     $self->fid->update_devcount(no_lock => 1);
 }
 
