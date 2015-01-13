@@ -147,7 +147,12 @@ sub add_to_db {
     my $sto = Mgd::get_store();
     if ($sto->add_fidid_to_devid($self->{fidid}, $self->{devid})) {
         if (my $memc = MogileFS::Config->memcache_client) {
-            $memc->delete("mogdevids:$self->{fidid}");
+            my $memcache_ttl  = MogileFS::Config->server_setting_cached("memcache_ttl") || 3600;
+            my $memkey = "mogdevids:$self->{fidid}";
+            if (my $list = $memc->get($memkey)) {
+                push(@$list, $self->{devid});
+                $memc->set($memkey, $list, $memcache_ttl);
+            }
         }
         return $self->fid->update_devcount(no_lock => $no_lock);
     } else {
@@ -176,6 +181,7 @@ sub destroy {
 
     my $sto = Mgd::get_store();
     $sto->remove_fidid_from_devid($self->fidid, $self->devid);
+    # TODO(afeid): update our cache to remove this devid from the fid!
     $self->fid->update_devcount(no_lock => 1);
 }
 
