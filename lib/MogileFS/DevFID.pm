@@ -152,6 +152,12 @@ sub add_to_db {
             if (my $list = $memc->get($memkey)) {
                 push(@$list, $self->{devid});
                 $memc->set($memkey, $list, $memcache_ttl);
+            } else {
+                # during a replication healing event, data might not be in memcache
+                #   - force the new data in, in case we are in the middle of a rep-lag event
+                my @devids;
+                push(@devids, $self->{devid});
+                $memc->set($memkey, \@devids, $memcache_ttl);
             }
         }
         return $self->fid->update_devcount(no_lock => $no_lock);

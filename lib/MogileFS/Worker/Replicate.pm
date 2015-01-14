@@ -516,18 +516,21 @@ sub replicate {
     }
 
     if ($rr->is_happy) {
+        # Even if we didn't get a copy request, it's possible that we are spinning down
+        # that's too happy.  Even if we are in a lost_race condition, it doesn't hurt
+        # to send another set to mogilefs of the devids.  protects against replag & noverify=1
+        my @cache_devices = @on_up_devid;
+        my %args = (
+                dmid => $fid->dmid,
+                key => $fid->{dkey},
+                fid => $fidid,
+                devids => \@cache_devices,
+            );
+        debug("re-cache $fidid called, args=".join(',',keys(%args)));
+        debug("re-cache $fidid called, args=".join(',',(@cache_devices)));
+        my $rv = MogileFS::run_global_hook('file_replicated', \%args);
+        # if (defined $rv && ! $rv) { # undef = no hooks, 1 = success, 0 = failure }
         if ($got_copy_request) {
-            my @cache_devices = @on_up_devid;
-            my %args = (
-                    dmid => $fid->dmid,
-                    key => $fid->{dkey},
-                    fid => $fidid,
-                    devids => \@cache_devices,
-                );
-            debug("re-cache $fidid called, args=".join(',',keys(%args)));
-            debug("re-cache $fidid called, args=".join(',',(@cache_devices)));
-            my $rv = MogileFS::run_global_hook('file_replicated', \%args);
-            # if (defined $rv && ! $rv) { # undef = no hooks, 1 = success, 0 = failure }
             return $retunlock->(1);
         } else {
             return $retunlock->("lost_race");  # some other process got to it first.  policy was happy immediately.
