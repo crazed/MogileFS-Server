@@ -519,10 +519,10 @@ sub replicate {
         if ($got_copy_request) {
             my @cache_devices = @on_up_devid;
             my %args = (
-            	dmid => $fid->dmid,
-            	key => $fid->{dkey},
-            	fid => $fidid,
-            	devids => \@cache_devices,
+                    dmid => $fid->dmid,
+                    key => $fid->{dkey},
+                    fid => $fidid,
+                    devids => \@cache_devices,
                 );
             debug("re-cache $fidid called, args=".join(',',keys(%args)));
             debug("re-cache $fidid called, args=".join(',',(@cache_devices)));
