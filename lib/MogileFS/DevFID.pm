@@ -189,7 +189,7 @@ sub destroy {
     $sto->remove_fidid_from_devid($self->fidid, $self->devid);
     if (my $memc = MogileFS::Config->memcache_client) {
         my $memcache_ttl  = MogileFS::Config->server_setting_cached("memcache_ttl") || 3600;
-        my $memkey = "mogdevids:$self->fidid";
+        my $memkey = "mogdevids:".$self->fidid;
         if (my $list = $memc->get($memkey)) {
             my @devids;
             for my $devid (@$list) {
