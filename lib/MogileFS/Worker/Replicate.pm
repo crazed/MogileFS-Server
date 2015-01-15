@@ -517,17 +517,17 @@ sub replicate {
 
     if ($rr->is_happy) {
         if ($got_copy_request) {
-		my @cache_devices = @on_up_devid;
-		my %args = (
-			dmid => $fid->dmid,
-			key => $fid->{dkey},
-			fid => $fidid,
-			devids => \@cache_devices,
-		    );
-		debug("re-cache $fidid called, args=".join(',',keys(%args)));
-		debug("re-cache $fidid called, args=".join(',',(@cache_devices)));
-		my $rv = MogileFS::run_global_hook('file_replicated', \%args);
-		# if (defined $rv && ! $rv) { # undef = no hooks, 1 = success, 0 = failure }
+            my @cache_devices = @on_up_devid;
+            my %args = (
+            	dmid => $fid->dmid,
+            	key => $fid->{dkey},
+            	fid => $fidid,
+            	devids => \@cache_devices,
+                );
+            debug("re-cache $fidid called, args=".join(',',keys(%args)));
+            debug("re-cache $fidid called, args=".join(',',(@cache_devices)));
+            my $rv = MogileFS::run_global_hook('file_replicated', \%args);
+            # if (defined $rv && ! $rv) { # undef = no hooks, 1 = success, 0 = failure }
             return $retunlock->(1);
         } else {
             return $retunlock->("lost_race");  # some other process got to it first.  policy was happy immediately.
