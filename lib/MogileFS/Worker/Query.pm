@@ -342,6 +342,11 @@ sub cmd_create_open {
         }
         if (scalar(@new_dests) > 0) {
             @dests = @new_dests;
+            eval { $sto->update_tempfile_devids($fidid, join(',', map { $_->id } @dests)); };
+            if (@_) {
+                warn "Error updating devids for tempfile: @_\n";
+                return $self->err_line("failure updating devids");
+            }
         }
     }
 

@@ -1193,6 +1193,15 @@ sub tempfile_row_from_fid {
                                          undef, $fidid);
 }
 
+# update tempfile row for fid with new expected devids
+sub update_tempfile_devids {
+    my ($self, $fidid, $devids) = @_;
+    $self->dbh->do("UPDATE tempfile set devids=? WHERE fid=?", undef,
+                   $devids, $fidid);
+    $self->condthrow;
+    return 1
+}
+
 # return 1 on success, throw "dup" on duplicate devid or throws other error on failure
 sub create_device {
     my ($self, $devid, $hostid, $status) = @_;
