@@ -326,11 +326,17 @@ sub cmd_create_open {
     # be created.
     if (scalar(@repl_devices) > 0) {
         my @new_dests;
+        my @extra_dests;
         while (scalar(@new_dests) < $dev_count) {
             my $ddev = shift @repl_devices;
 
             last unless $ddev;
-            next unless $ddev->not_on_hosts(map { $_->host } @new_dests);
+            # If we already have a destination on this host, skip it but
+            # keep around the device for later if we do not have enough to meet our dev_count
+            unless ($ddev->not_on_hosts(map { $_->host } @new_dests)) {
+                push @extra_dests, $ddev;
+                next;
+            }
 
             push @new_dests, $ddev;
             # Create a new replication request, this time with on_devs set to our proposed new destinations.
@@ -341,6 +347,17 @@ sub cmd_create_open {
             @repl_devices = $rr->copy_to_one_of_ideally();
         }
         if (scalar(@new_dests) > 0) {
+            # Make sure we have enough devices one more time, however,
+            # if extra_dests is empty we will not be able to return dev_count.
+            while (scalar(@new_dests) < $dev_count) {
+                my $ddev = shift @extra_dests || shift @dests;
+                last unless $ddev;
+                # Ensure we don't add a device that already exists
+                if (grep($_->id == $ddev->id, @new_dests)) {
+                    next;
+                }
+                push @new_dests, $ddev;
+            }
             @dests = @new_dests;
             eval { $sto->update_tempfile_devids($fidid, join(',', map { $_->id } @dests)); };
             if (@_) {
