@@ -293,6 +293,42 @@ sub cmd_create_open {
         return $self->err_line("db");
     }
 
+
+    # Create a MogileFS::Class instance, which we can use for determining a replication policy
+    # which in turn, lets us create a replication request to get ideal devs for this class.
+    my $classobj = Mgd::class_factory()->get_by_id($dmid, $classid);
+    my $replobj = $classobj->repl_policy_obj();
+    # We want to use the devices already determined as decent for this new file when
+    # calling replicate_to. To do this, we must create a map of devid => device.
+    my %device_map = map { $_->id => $_ } @devices;
+    my $replreq = $replobj->replicate_to(fid => $fidid,
+                                         on_devs => [],
+                                         all_devs => \%device_map,
+                                         failed => {},
+                                         min => $classobj->mindevcount());
+
+    # Now we have a replication request, we can reach into ideal to get a list of ideal devices
+    my @repl_devices = $replreq->copy_to_one_of_ideally();
+
+    # If we have ideal devices, update @dests. This should be fine, since
+    # the tempfile table is not a definitive authority on where a new file will
+    # be created.
+    if (scalar(@repl_devices) > 0) {
+        my @new_dests;
+        while (scalar(@new_dests) < ($multi ? 3 : 1)) {
+            my $ddev = shift @repl_devices;
+
+            last unless $ddev;
+            next unless $ddev->not_on_hosts(map { $_->host } @new_dests);
+
+            push @new_dests, $ddev;
+        }
+        if (scalar(@new_dests) > 0) {
+            @dests = @new_dests;
+        }
+    }
+
+
     # make sure directories exist for client to be able to PUT into
     my %dir_done;
     $profstart->("vivify_dir_on_all_devs");
