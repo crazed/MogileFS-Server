@@ -376,6 +376,7 @@ sub server_setting_is_writable {
     if ($key eq "case_sensitive_list_keys") { return $bool };
     if ($key eq "memcache_servers") { return $any  };
     if ($key eq "memcache_ttl") { return $num };
+    if ($key eq "multi_dest_dev_count") { return $num };
     if ($key eq "internal_queue_limit") { return $num };
 
     # ReplicationPolicy::MultipleNetworks

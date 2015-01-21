@@ -272,10 +272,14 @@ sub cmd_create_open {
     my @dests; # MogileFS::Device objects which are suitable
 
     # If we're doing a multi_dest create_open, and a class has a min dev count greater than 1,
-    # we should probably use that for the number of devices to return.
-    my $dev_count = $multi ? 3 : 1;
-    if ($multi && $classobj->mindevcount > 1) {
-        $dev_count = $classobj->mindevcount;
+    # we should probably use that for the number of devices to return. If there's a multi_dest_dev_count,
+    # use that as the definitive number.
+    my $dev_count = 1;
+    if ($multi) {
+        if ($classobj->mindevcount > 1) {
+            $dev_count = $classobj->mindevcount;
+        }
+        $dev_count  = MogileFS::Config->server_setting_cached("multi_dest_dev_count") || $dev_count;
     }
 
     while (scalar(@dests) < $dev_count) {
