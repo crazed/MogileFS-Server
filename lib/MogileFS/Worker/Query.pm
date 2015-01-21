@@ -264,10 +264,21 @@ sub cmd_create_open {
         @devices = sort_devs_by_freespace(@devices);
     }
 
+    # Create a MogileFS::Class instance, which we can use for determining a replication policy
+    # which in turn, lets us create a replication request to get ideal devs for this class.
+    my $classobj = Mgd::class_factory()->get_by_id($dmid, $classid);
+
     # find suitable device(s) to put this file on.
     my @dests; # MogileFS::Device objects which are suitable
 
-    while (scalar(@dests) < ($multi ? 3 : 1)) {
+    # If we're doing a multi_dest create_open, and a class has a min dev count greater than 1,
+    # we should probably use that for the number of devices to return.
+    my $dev_count = $multi ? 3 : 1;
+    if ($multi && $classobj->mindevcount > 1) {
+        $dev_count = $classobj->mindevcount;
+    }
+
+    while (scalar(@dests) < $dev_count) {
         my $ddev = shift @devices;
 
         last unless $ddev;
@@ -292,6 +303,44 @@ sub cmd_create_open {
         warn "Error registering tempfile: $@\n";
         return $self->err_line("db");
     }
+
+    # We want to use the devices already determined as decent for this new file when
+    # calling replicate_to. To do this, we must create a map of devid => device.
+    my %device_map = map { $_->id => $_ } @devices;
+    my $replobj = $classobj->repl_policy_obj();
+    my $replreq = $replobj->replicate_to(fid => $fidid,
+                                         on_devs => [],
+                                         all_devs => \%device_map,
+                                         failed => {},
+                                         min => $classobj->mindevcount());
+
+    # Now we have a replication request, we can reach into ideal to get a list of ideal devices
+    my @repl_devices = $replreq->copy_to_one_of_ideally();
+
+    # If we have ideal devices, update @dests. This should be fine, since
+    # the tempfile table is not a definitive authority on where a new file will
+    # be created.
+    if (scalar(@repl_devices) > 0) {
+        my @new_dests;
+        while (scalar(@new_dests) < $dev_count) {
+            my $ddev = shift @repl_devices;
+
+            last unless $ddev;
+            next unless $ddev->not_on_hosts(map { $_->host } @new_dests);
+
+            push @new_dests, $ddev;
+            # Create a new replication request, this time with on_devs set to our proposed new destinations.
+            # We do this because it will cause the replication policy to return new ideal devices that do not
+            # include devs we already intend to write to.
+            my $rr = $replreq = $replobj->replicate_to(fid => $fidid, on_devs => \@new_dests, all_devs => \%device_map,
+                                                       failed => {}, min => $classobj->mindevcount);
+            @repl_devices = $rr->copy_to_one_of_ideally();
+        }
+        if (scalar(@new_dests) > 0) {
+            @dests = @new_dests;
+        }
+    }
+
 
     # make sure directories exist for client to be able to PUT into
     my %dir_done;
